@@ -3,10 +3,6 @@ with Ada.Containers.Vectors;
 
 package body Unicode_Collation is
 
-   package String_Vectors is new Ada.Containers.Vectors(
-      Index_Type => Positive,
-      Element_Type => String);
-
    Level_Separator : constant Collation_Weight := 0;
    DUCET_Initialized : Boolean := False;
    Max_Weight : constant Collation_Weight := 65535;
@@ -339,13 +335,13 @@ package body Unicode_Collation is
    end Compare_Dynamic_Tailored;
 
    function Compare_Primary (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Strength => Primary, others => Default_Settings);
+      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Primary;
 
    function Compare_Secondary (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Strength => Secondary, others => Default_Settings);
+      Settings : Parametric_Settings := (Secondary, Non_Ignorable, Off, Off, NFD);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Secondary;
@@ -356,25 +352,25 @@ package body Unicode_Collation is
    end Compare_Tertiary;
 
    function Compare_Quaternary (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Strength => Quaternary, others => Default_Settings);
+      Settings : Parametric_Settings := (Quaternary, Non_Ignorable, Off, Off, NFD);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Quaternary;
 
    function Compare_Non_Ignorable (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Variable_Weight => Non_Ignorable, others => Default_Settings);
+      Settings : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Non_Ignorable;
 
    function Compare_Shifted (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Variable_Weight => Shifted, others => Default_Settings);
+      Settings : Parametric_Settings := (Tertiary, Shifted, Off, Off, NFD);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Shifted;
 
    function Compare_Shift_Trimmed (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Variable_Weight => Shift_Trimmed, others => Default_Settings);
+      Settings : Parametric_Settings := (Tertiary, Shift_Trimmed, Off, Off, NFD);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Shift_Trimmed;
@@ -390,5 +386,9 @@ package body Unicode_Collation is
    end Are_Valid_Settings;
 
    function Get_Level_Separator return Collation_Weight is (Level_Separator);
+
+   package String_Vectors is new Ada.Containers.Vectors(
+      Index_Type => Positive,
+      Element_Type => String);
 
 end Unicode_Collation;
