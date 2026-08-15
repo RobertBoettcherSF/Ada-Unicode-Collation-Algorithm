@@ -1,18 +1,8 @@
 with Ada.Text_IO; use Ada.Text_IO;
-with Ada.Containers.Vectors;
 with Unicode_Collation; use Unicode_Collation;
 
 procedure Main is
-   package String_Vectors is new Ada.Containers.Vectors(
-      Index_Type => Positive,
-      Element_Type => String);
-
    Vec : String_Vectors.Vector;
-
-   function To_US (S : String) return Unicode_String is
-   begin
-      return Unicode_String(S);
-   end To_US;
 
 begin
    Put_Line("Unicode Collation Algorithm Demo");
@@ -33,30 +23,19 @@ begin
    Vec.Append("123");
 
    Put_Line("Sorting with default settings (Tertiary strength):");
-   declare
-      US_Vec : Ada.Containers.Vectors.Vector;
-   begin
-      for I in 1 .. Positive(Vec.Length) loop
-         US_Vec.Append(To_US(Vec.Element(I)));
-      end loop;
-      Sort(US_Vec);
-      for I in 1 .. Positive(US_Vec.Length) loop
-         Put_Line(Integer'Image(I) & ". " & String(Unicode_String'(US_Vec.Element(I))));
-      end loop;
-   end;
+   Sort(Vec);
+   for I in 1 .. Positive(Vec.Length) loop
+      Put_Line(Integer'Image(I) & ". " & Vec.Element(I));
+   end loop;
    New_Line;
 
    Put_Line("Sorting with Primary strength (case-insensitive):");
    declare
-      US_Vec : Ada.Containers.Vectors.Vector;
       Settings : Parametric_Settings := (Strength => Primary, others => Default_Settings);
    begin
+      Sort(Vec, Settings);
       for I in 1 .. Positive(Vec.Length) loop
-         US_Vec.Append(To_US(Vec.Element(I)));
-      end loop;
-      Sort(US_Vec, Settings);
-      for I in 1 .. Positive(US_Vec.Length) loop
-         Put_Line(Integer'Image(I) & ". " & String(Unicode_String'(US_Vec.Element(I))));
+         Put_Line(Integer'Image(I) & ". " & Vec.Element(I));
       end loop;
    end;
    New_Line;
@@ -66,7 +45,7 @@ begin
    declare
       Result : Integer;
    begin
-      Result := Compare(To_US("apple"), To_US("Apple"));
+      Result := Compare("apple", "Apple");
       if Result < 0 then
          Put_Line("Compare(""apple"", ""Apple"") = " & Integer'Image(Result) & " (apple < Apple)");
       elsif Result > 0 then
@@ -75,7 +54,7 @@ begin
          Put_Line("Compare(""apple"", ""Apple"") = " & Integer'Image(Result) & " (equal)");
       end if;
 
-      Result := Compare(To_US("apple"), To_US("ápple"));
+      Result := Compare("apple", "ápple");
       if Result < 0 then
          Put_Line("Compare(""apple"", ""ápple"") = " & Integer'Image(Result) & " (apple < ápple)");
       elsif Result > 0 then
@@ -84,7 +63,7 @@ begin
          Put_Line("Compare(""apple"", ""ápple"") = " & Integer'Image(Result) & " (equal)");
       end if;
 
-      Result := Compare(To_US("123"), To_US("abc"));
+      Result := Compare("123", "abc");
       if Result < 0 then
          Put_Line("Compare(""123"", ""abc"") = " & Integer'Image(Result) & " (123 < abc)");
       elsif Result > 0 then
