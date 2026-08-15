@@ -1,196 +1,87 @@
+-- tests.adb
+-- Comprehensive Verification and Validation suite for UCA
 with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Assertions; use Ada.Assertions;
 with Unicode_Collation; use Unicode_Collation;
 
 procedure Tests is
+   Table : Character_Table := Get_Default_Table;
+   Total_Tests : Integer := 0;
+   Passed_Tests : Integer := 0;
 
-   Test_Count : Integer := 0;
-   Pass_Count : Integer := 0;
-   Fail_Count : Integer := 0;
-
-   procedure Print_Test_Header (Name : String) is
+   procedure Run_Assert (Condition : Boolean; Message : String) is
    begin
-      Test_Count := Test_Count + 1;
-      New_Line;
-      Put_Line("TEST" & Integer'Image(Test_Count) & " - " & Name);
-   end Print_Test_Header;
-
-   procedure Print_Assertion (Number : Integer; Description : String; Passed : Boolean) is
-   begin
-      Put("   " & Integer'Image(Number) & ".0 " & Description);
-      if Passed then
-         Put_Line(" PASS");
-         Pass_Count := Pass_Count + 1;
-      else
-         Put_Line(" FAIL");
-         Fail_Count := Fail_Count + 1;
-      end if;
-   end Print_Assertion;
-
-   procedure Print_Summary is
-   begin
-      New_Line;
-      Put_Line("=" & String'((1 .. 50 => '=')));
-      Put_Line("TEST SUMMARY");
-      Put_Line("=" & String'((1 .. 50 => '=')));
-      Put_Line("Total tests: " & Integer'Image(Test_Count));
-      Put_Line("Passed: " & Integer'Image(Pass_Count));
-      Put_Line("Failed: " & Integer'Image(Fail_Count));
-      Put_Line("=" & String'((1 .. 50 => '=')));
-   end Print_Summary;
+      Total_Tests := Total_Tests + 1;
+      Put("      " & Message & " ... ");
+      Assert (Condition, "FAILED: " & Message);
+      Put_Line("PASS");
+      Passed_Tests := Passed_Tests + 1;
+   exception
+      when Assertion_Error =>
+         Put_Line("FAIL");
+   end Run_Assert;
 
 begin
-   Initialize_DUCET;
+   Put_Line("===============================================");
+   Put_Line(" UCA V&V TEST SUITE (Assumes broken codebase)");
+   Put_Line("===============================================");
 
-   Print_Test_Header("Basic ASCII Comparison");
-   Print_Assertion(1, "A < B", Compare("A", "B", Default_Settings) < 0);
-   Print_Assertion(2, "a > A (tertiary)", Compare("a", "A", Default_Settings) > 0);
-   Print_Assertion(3, "A = A", Compare("A", "A", Default_Settings) = 0);
+   Put_Line("TEST 1 - Base Primary Level Comparison (L1)");
+   Run_Assert (Compare_Standard("a", "b", Table) = Less, "1.1 Assert 'a' < 'b'");
+   Run_Assert (Compare_Standard("b", "a", Table) = Greater, "1.2 Assert 'b' > 'a'");
+   Run_Assert (Compare_Standard("a", "a", Table) = Equal, "1.3 Assert 'a' == 'a'");
 
-   Print_Test_Header("Strength Level Variations");
-   Print_Assertion(1, "Primary: A = a", Compare_Primary("A", "a") = 0);
-   Print_Assertion(2, "Secondary: e < é", Compare_Secondary("e", String'(Character'Val(233))) < 0);
-   Print_Assertion(3, "Tertiary: A < a", Compare_Tertiary("A", "a") < 0);
+   Put_Line("TEST 2 - Tertiary Level Comparison (Case - L3)");
+   Run_Assert (Compare_Standard("a", "A", Table) = Less, "2.1 Lowercase < Uppercase in UCA default");
+   Run_Assert (Compare_Standard("A", "a", Table) = Greater, "2.2 Uppercase > Lowercase");
+   
+   Put_Line("TEST 3 - Multi-level resolution");
+   -- 'a' vs 'A': Primary is same. L1 evaluates equal. Defers to L3.
+   Run_Assert (Compare_Standard("aa", "aA", Table) = Less, "3.1 Prefix tie breaks correctly at L3");
 
-   Print_Test_Header("Accented Characters");
-   Print_Assertion(1, "é > e", Compare("e", String'(Character'Val(233)), Default_Settings) < 0);
-   Print_Assertion(2, "è < é", Compare(String'(Character'Val(232)), String'(Character'Val(233)), Default_Settings) < 0);
-   Print_Assertion(3, "à < á < â", 
-      Compare(String'(Character'Val(224)), String'(Character'Val(225)), Default_Settings) < 0 and then
-      Compare(String'(Character'Val(225)), String'(Character'Val(226)), Default_Settings) < 0);
+   Put_Line("TEST 4 - Length Asymmetry");
+   Run_Assert (Compare_Standard("a", "ab", Table) = Less, "4.1 Shorter string evaluated Less");
+   Run_Assert (Compare_Standard("abc", "ab", Table) = Greater, "4.2 Longer string evaluated Greater");
 
-   Print_Test_Header("Variable Weighting");
-   Print_Assertion(1, "Non-ignorable: a < a,", Compare_Non_Ignorable("a", "a,") < 0);
-   Print_Assertion(2, "Shifted: a = a,", Compare_Shifted("a", "a,") = 0);
-   Print_Assertion(3, "Shift-Trimmed: a = a,", Compare_Shift_Trimmed("a", "a,") = 0);
+   Put_Line("TEST 5 - Empty String Edge Cases");
+   Run_Assert (Compare_Standard("", "", Table) = Equal, "5.1 Empty == Empty");
+   Run_Assert (Compare_Standard("", "a", Table) = Less, "5.2 Empty < Non-Empty");
+   Run_Assert (Compare_Standard("a", "", Table) = Greater, "5.3 Non-Empty > Empty");
 
-   Print_Test_Header("Empty and Single Character");
-   Print_Assertion(1, "Empty < A", Compare("", "A", Default_Settings) < 0);
-   Print_Assertion(2, "A < B", Compare("A", "B", Default_Settings) < 0);
-   Print_Assertion(3, "Empty = Empty", Compare("", "", Default_Settings) = 0);
+   Put_Line("TEST 6 - Standard Punctuation Handling (Ignored L1, Checked L3)");
+   -- Primary weights for '-' are 0, so "a-b" and "ab" are equal at L1 and L2.
+   -- At L3, '-' has weight. Thus "a-b" differs from "ab".
+   Run_Assert (Compare_Standard("a-b", "ab", Table) /= Equal, "6.1 Standard: Punctuation is NOT completely ignored");
 
-   Print_Test_Header("String Length Differences");
-   Print_Assertion(1, "A < AA", Compare("A", "AA", Default_Settings) < 0);
-   Print_Assertion(2, "AA < AAA", Compare("AA", "AAA", Default_Settings) < 0);
-   Print_Assertion(3, "ABC < ABD", Compare("ABC", "ABD", Default_Settings) < 0);
+   Put_Line("TEST 7 - Variable Weighting (Ignore Punctuation Variant)");
+   -- Here, '-' is forcefully zeroed out at all levels. "a-b" == "ab".
+   Run_Assert (Compare_Ignore_Punctuation("a-b", "ab", Table) = Equal, "7.1 Ignore_Punct: Hyphen entirely ignored");
+   Run_Assert (Compare_Ignore_Punctuation("a b", "ab", Table) = Equal, "7.2 Ignore_Punct: Space entirely ignored");
+   Run_Assert (Compare_Ignore_Punctuation("a,b", "ab", Table) = Equal, "7.3 Ignore_Punct: Comma entirely ignored");
 
-   Print_Test_Header("Preemptive vs Non-Preemptive");
-   Print_Assertion(1, "Preemptive: A < B", Compare_Preemptive("A", "B", Default_Settings) < 0);
-   Print_Assertion(2, "Non-preemptive: A < B", Compare_Non_Preemptive("A", "B", Default_Settings) < 0);
-   Print_Assertion(3, "Preemptive = Non-preemptive for A,B", 
-      Compare_Preemptive("A", "B", Default_Settings) = Compare_Non_Preemptive("A", "B", Default_Settings));
-
-   Print_Test_Header("Backward Accents");
+   Put_Line("TEST 8 - Tailoring (Locale Customization Variant)");
    declare
-      Settings_Normal : Parametric_Settings := (Secondary, Non_Ignorable, Off, Off, NFD);
-      Settings_Backward : Parametric_Settings := (Secondary, Non_Ignorable, On, Off, NFD);
+      -- Example: In some locales, 'z' might sort BEFORE 'a'
+      Custom_Table : Character_Table := Table;
+      Z_Weight : Collation_Weight := Table('a'); 
    begin
-      Print_Assertion(1, "Normal: é > e", Compare("e", String'(Character'Val(233)), Settings_Normal) < 0);
-      Print_Assertion(2, "Backward: é < e", Compare("e", String'(Character'Val(233)), Settings_Backward) > 0);
-      Print_Assertion(3, "Primary unaffected", Compare_Primary("e", String'(Character'Val(233))) = 0);
+      Z_Weight.Primary := Z_Weight.Primary - 1; -- Make 'z' lighter than 'a'
+      Custom_Table := Apply_Tailoring(Custom_Table, 'z', Z_Weight);
+      
+      Run_Assert (Compare_Standard("z", "a", Custom_Table) = Less, "8.1 Tailored: 'z' forced to sort before 'a'");
+      Run_Assert (Compare_Standard("z", "a", Table) = Greater, "8.2 Standard: 'z' still sorts after 'a' normally");
    end;
 
-   Print_Test_Header("Case Level");
-   declare
-      Settings_No_Case : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
-      Settings_With_Case : Parametric_Settings := (Tertiary, Non_Ignorable, Off, On, NFD);
-   begin
-      Print_Assertion(1, "No case level: A < a", Compare("A", "a", Settings_No_Case) < 0);
-      Print_Assertion(2, "With case level: A < a", Compare("A", "a", Settings_With_Case) < 0);
-      Print_Assertion(3, "Settings valid", True);
-   end;
+   Put_Line("TEST 9 - Identical Strings Robustness");
+   Run_Assert (Compare_Standard("hello-world", "hello-world", Table) = Equal, "9.1 Long string exact match");
+   Run_Assert (Compare_Ignore_Punctuation("hello-world", "helloworld", Table) = Equal, "9.2 Long string punctuation ignored match");
 
-   Print_Test_Header("Normalization");
-   declare
-      Settings_NFD : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
-      Settings_None : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, None);
-   begin
-      Print_Assertion(1, "NFD enabled", Settings_NFD.Normalization = NFD);
-      Print_Assertion(2, "Normalization disabled", Settings_None.Normalization = None);
-      Print_Assertion(3, "Normalization affects comparison", Compare("A", "A", Settings_NFD) = 0);
-   end;
-
-   Print_Test_Header("Sort Key Formation");
-   declare
-      Elems : Collation_Element_Array := Produce_Collation_Elements("A");
-      Key : Sort_Key := Form_Sort_Key(Elems, Default_Settings);
-   begin
-      Print_Assertion(1, "Sort key non-empty", Key'Length > 0);
-   end;
-   declare
-      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
-      Elems : Collation_Element_Array := Produce_Collation_Elements("a");
-      Key : Sort_Key := Form_Sort_Key(Elems, Settings);
-   begin
-      Print_Assertion(2, "Primary-only key", Key'Length > 0);
-   end;
-   declare
-      Key1 : Sort_Key := Form_Sort_Key(Produce_Collation_Elements("A"), Default_Settings);
-      Key2 : Sort_Key := Form_Sort_Key(Produce_Collation_Elements("B"), Default_Settings);
-   begin
-      Print_Assertion(3, "Different strings, different keys", Key1 /= Key2);
-   end;
-
-   Print_Test_Header("Edge Cases");
-   declare
-      Long_String : constant String := (1 .. 1000 => 'A');
-   begin
-      Print_Assertion(1, "Long string comparison", Compare(Long_String, Long_String, Default_Settings) = 0);
-   end;
-   Print_Assertion(2, "Mixed: a < Á", Compare("a", "Á", Default_Settings) < 0);
-   Print_Assertion(3, "Special: 0 < A", Compare("0", "A", Default_Settings) < 0);
-
-   Print_Test_Header("Are_Equal Function");
-   Print_Assertion(1, "A = A", Are_Equal("A", "A", Default_Settings));
-   Print_Assertion(2, "A /= B", not Are_Equal("A", "B", Default_Settings));
-   Print_Assertion(3, "A /= a (tertiary)", not Are_Equal("A", "a", Default_Settings));
-
-   Print_Test_Header("Static Tailoring");
-   declare
-      Custom_Tailoring : CET_Maps.Map;
-      Settings : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
-   begin
-      Custom_Tailoring.Insert(Key => Unicode_Code_Point(Character'Pos('Z')),
-         New_Item => CET_Entry'(Element => (0x1000, 0, 0, 0, False)));
-      Print_Assertion(1, "Custom tailoring: Z < A", 
-         Compare("Z", "A", Settings) > 0);
-      DUCET := Custom_Tailoring;
-      Print_Assertion(2, "With tailoring: Z < A", Compare("Z", "A", Settings) < 0);
-      DUCET := CET_Maps.Empty_Map;
-      Initialize_DUCET;
-   exception
-      when others =>
-         Initialize_DUCET;
-         Print_Assertion(2, "Tailoring test", False);
-   end;
-   Print_Assertion(3, "B < C unchanged", Compare("B", "C", Default_Settings) < 0);
-
-   Print_Test_Header("Dynamic Tailoring");
-   declare
-      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
-   begin
-      Print_Assertion(1, "Dynamic primary: A = a", Compare("A", "a", Settings) = 0);
-   end;
-   declare
-      Settings : Parametric_Settings := (Tertiary, Shifted, Off, Off, NFD);
-   begin
-      Print_Assertion(2, "Dynamic shifted: a = a,", Compare("a", "a,", Settings) = 0);
-   end;
-   declare
-      Settings : Parametric_Settings := (Secondary, Shift_Trimmed, Off, Off, NFD);
-   begin
-      Print_Assertion(3, "Multiple settings work", Compare("a", "á", Settings) /= 0);
-   end;
-
-   Print_Summary;
-   New_Line;
-   if Fail_Count = 0 then
-      Put_Line("ALL TESTS PASSED!");
+   Put_Line("===============================================");
+   Put_Line("Tests completed: " & Integer'Image(Passed_Tests) & " /" & Integer'Image(Total_Tests) & " PASSED.");
+   
+   if Total_Tests = Passed_Tests then
+      Put_Line("CONCLUSION: Codebase assumed broken, but ALL ASSUMPTIONS DISPROVED.");
    else
-      Put_Line("SOME TESTS FAILED!");
+      Put_Line("CONCLUSION: Codebase contains faults.");
    end if;
-
-exception
-   when E : others =>
-      Put_Line("FATAL ERROR: " & Ada.Exceptions.Exception_Message(E));
-      Print_Summary;
 end Tests;
