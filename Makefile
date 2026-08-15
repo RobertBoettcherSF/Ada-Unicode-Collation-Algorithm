@@ -1,26 +1,17 @@
 .PHONY: all test clean
 
+GNAT = gnatmake
 OBJ_DIR = obj
 BIN_DIR = bin
-GPR_FILE = unicode_collation.gpr
-MAIN_EXE = $(BIN_DIR)/unicode_collation
-TEST_EXE = $(BIN_DIR)/tests
 
-all: $(MAIN_EXE) $(TEST_EXE)
+all: $(BIN_DIR)/tests
 
-$(MAIN_EXE): main.adb unicode_collation.ads unicode_collation.adb
-	@mkdir -p $(OBJ_DIR) $(BIN_DIR)
-	gnatmake -P $(GPR_FILE) -o $(MAIN_EXE) main.adb
+$(BIN_DIR)/tests: tests.adb unicode_collation.adb unicode_collation.ads
+	mkdir -p $(OBJ_DIR) $(BIN_DIR)$(GNAT) -P uca.gpr
 
-$(TEST_EXE): tests.adb unicode_collation.ads unicode_collation.adb
-	@mkdir -p $(OBJ_DIR) $(BIN_DIR)
-	gnatmake -P $(GPR_FILE) -o $(TEST_EXE) tests.adb
-
-test: $(TEST_EXE)
-	@echo "Running Unicode Collation Algorithm tests..."
-	@$(TEST_EXE)
+test: all
+	@echo "Running tests..."
+	@./$(BIN_DIR)/tests
 
 clean:
-	rm -rf $(OBJ_DIR)/* $(BIN_DIR)/*
-
-.PHONY: all test clean
+	rm -rf $(OBJ_DIR)/*$(BIN_DIR)/*
