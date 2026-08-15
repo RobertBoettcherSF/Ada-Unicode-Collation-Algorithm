@@ -3,6 +3,10 @@ with Ada.Containers.Vectors;
 
 package body Unicode_Collation is
 
+   package String_Vectors is new Ada.Containers.Vectors(
+      Index_Type => Positive,
+      Element_Type => String);
+
    Level_Separator : constant Collation_Weight := 0;
    DUCET_Initialized : Boolean := False;
    Max_Weight : constant Collation_Weight := 65535;
@@ -67,7 +71,7 @@ package body Unicode_Collation is
 
    function Is_DUCET_Initialized return Boolean is (DUCET_Initialized);
 
-   function Normalize (Input : Unicode_String; Mode : Normalization_Mode := NFD) return Unicode_String is
+   function Normalize (Input : String; Mode : Normalization_Mode := NFD) return String is
    begin
       if Mode = None then
          return Input;
@@ -86,13 +90,13 @@ package body Unicode_Collation is
                when others => Append(Output, Input(I));
             end case;
          end loop;
-         return Unicode_String(To_String(Output));
+         return To_String(Output);
       end;
    exception
       when others => raise Normalization_Error with "Normalization failed";
    end Normalize;
 
-   function To_Code_Points (S : Unicode_String) return Code_Point_Array is
+   function To_Code_Points (S : String) return Code_Point_Array is
       Result : Code_Point_Array(1 .. S'Length);
    begin
       for I in S'Range loop
@@ -102,21 +106,6 @@ package body Unicode_Collation is
    exception
       when others => raise Invalid_Code_Point with "Invalid code point in string";
    end To_Code_Points;
-
-   function To_Unicode_String (Points : Code_Point_Array) return Unicode_String is
-      Result : Unicode_String(1 .. Points'Length);
-   begin
-      for I in Points'Range loop
-         if Points(I) <= 255 then
-            Result(I) := Character'Val(Points(I));
-         else
-            Result(I) := '?';
-         end if;
-      end loop;
-      return Result;
-   exception
-      when others => raise Invalid_Code_Point with "Invalid code point conversion";
-   end To_Unicode_String;
 
    function Get_Collation_Element (Code_Point : Unicode_Code_Point; Table : CET_Maps.Map := DUCET) return Collation_Element is
    begin
@@ -130,8 +119,8 @@ package body Unicode_Collation is
       end if;
    end Get_Collation_Element;
 
-   function Produce_Collation_Elements (Input : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Collation_Element_Array is
-      Normalized : Unicode_String := Normalize(Input, Settings.Normalization);
+   function Produce_Collation_Elements (Input : String; Settings : Parametric_Settings := Default_Settings) return Collation_Element_Array is
+      Normalized : String := Normalize(Input, Settings.Normalization);
       Points     : Code_Point_Array := To_Code_Points(Normalized);
       Result     : Collation_Element_Array(1 .. Points'Length);
    begin
@@ -226,9 +215,9 @@ package body Unicode_Collation is
       when others => raise Collation_Error with "Failed to compare sort keys";
    end Compare_Sort_Keys;
 
-   function Compare (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Integer is
-      Norm1 : Unicode_String := Normalize(Str1, Settings.Normalization);
-      Norm2 : Unicode_String := Normalize(Str2, Settings.Normalization);
+   function Compare (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer is
+      Norm1 : String := Normalize(Str1, Settings.Normalization);
+      Norm2 : String := Normalize(Str2, Settings.Normalization);
       Elems1 : Collation_Element_Array := Produce_Collation_Elements(Norm1, Settings);
       Elems2 : Collation_Element_Array := Produce_Collation_Elements(Norm2, Settings);
       Key1 : Sort_Key := Form_Sort_Key(Elems1, Settings);
@@ -239,15 +228,15 @@ package body Unicode_Collation is
       when others => raise Collation_Error with "Comparison failed";
    end Compare;
 
-   procedure Sort (Strings : in out Ada.Containers.Vectors.Vector; Settings : Parametric_Settings := Default_Settings) is
+   procedure Sort (Strings : in out String_Vectors.Vector; Settings : Parametric_Settings := Default_Settings) is
       N : constant Positive := Positive(Strings.Length);
-      Temp : Unicode_String;
+      Temp : String;
    begin
       for I in 1 .. N - 1 loop
          for J in 1 .. N - I loop
             declare
-               Str1 : Unicode_String := Ada.Containers.Vectors.Element(Strings, J);
-               Str2 : Unicode_String := Ada.Containers.Vectors.Element(Strings, J + 1);
+               Str1 : String := String_Vectors.Element(Strings, J);
+               Str2 : String := String_Vectors.Element(Strings, J + 1);
             begin
                if Compare(Str1, Str2, Settings) > 0 then
                   Temp := Str1;
@@ -261,14 +250,14 @@ package body Unicode_Collation is
       when others => raise Collation_Error with "Sort failed";
    end Sort;
 
-   function Are_Equal (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Boolean is
+   function Are_Equal (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Boolean is
    begin
       return Compare(Str1, Str2, Settings) = 0;
    end Are_Equal;
 
-   function Compare_Preemptive (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Integer is
-      Norm1 : Unicode_String := Normalize(Str1, Settings.Normalization);
-      Norm2 : Unicode_String := Normalize(Str2, Settings.Normalization);
+   function Compare_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer is
+      Norm1 : String := Normalize(Str1, Settings.Normalization);
+      Norm2 : String := Normalize(Str2, Settings.Normalization);
       Elems1 : Collation_Element_Array := Produce_Collation_Elements(Norm1, Settings);
       Elems2 : Collation_Element_Array := Produce_Collation_Elements(Norm2, Settings);
       Max_Len : constant Positive := Positive'Max(Elems1'Length, Elems2'Length);
@@ -323,12 +312,12 @@ package body Unicode_Collation is
       when others => raise Collation_Error with "Preemptive comparison failed";
    end Compare_Preemptive;
 
-   function Compare_Non_Preemptive (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Integer is
+   function Compare_Non_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer is
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Non_Preemptive;
 
-   function Compare_Static_Tailored (Str1, Str2 : Unicode_String; Tailoring : CET_Maps.Map; Settings : Parametric_Settings := Default_Settings) return Integer is
+   function Compare_Static_Tailored (Str1, Str2 : String; Tailoring : CET_Maps.Map; Settings : Parametric_Settings := Default_Settings) return Integer is
       Old_DUCET : CET_Maps.Map := DUCET;
    begin
       DUCET := Tailoring;
@@ -344,63 +333,51 @@ package body Unicode_Collation is
          raise;
    end Compare_Static_Tailored;
 
-   function Compare_Dynamic_Tailored (Str1, Str2 : Unicode_String; Settings : Parametric_Settings) return Integer is
+   function Compare_Dynamic_Tailored (Str1, Str2 : String; Settings : Parametric_Settings) return Integer is
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Dynamic_Tailored;
 
-   function Compare_Primary (Str1, Str2 : Unicode_String) return Integer is
+   function Compare_Primary (Str1, Str2 : String) return Integer is
       Settings : Parametric_Settings := (Strength => Primary, others => Default_Settings);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Primary;
 
-   function Compare_Secondary (Str1, Str2 : Unicode_String) return Integer is
+   function Compare_Secondary (Str1, Str2 : String) return Integer is
       Settings : Parametric_Settings := (Strength => Secondary, others => Default_Settings);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Secondary;
 
-   function Compare_Tertiary (Str1, Str2 : Unicode_String) return Integer is
+   function Compare_Tertiary (Str1, Str2 : String) return Integer is
    begin
       return Compare(Str1, Str2, Default_Settings);
    end Compare_Tertiary;
 
-   function Compare_Quaternary (Str1, Str2 : Unicode_String) return Integer is
+   function Compare_Quaternary (Str1, Str2 : String) return Integer is
       Settings : Parametric_Settings := (Strength => Quaternary, others => Default_Settings);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Quaternary;
 
-   function Compare_Non_Ignorable (Str1, Str2 : Unicode_String) return Integer is
+   function Compare_Non_Ignorable (Str1, Str2 : String) return Integer is
       Settings : Parametric_Settings := (Variable_Weight => Non_Ignorable, others => Default_Settings);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Non_Ignorable;
 
-   function Compare_Shifted (Str1, Str2 : Unicode_String) return Integer is
+   function Compare_Shifted (Str1, Str2 : String) return Integer is
       Settings : Parametric_Settings := (Variable_Weight => Shifted, others => Default_Settings);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Shifted;
 
-   function Compare_Shift_Trimmed (Str1, Str2 : Unicode_String) return Integer is
+   function Compare_Shift_Trimmed (Str1, Str2 : String) return Integer is
       Settings : Parametric_Settings := (Variable_Weight => Shift_Trimmed, others => Default_Settings);
    begin
       return Compare(Str1, Str2, Settings);
    end Compare_Shift_Trimmed;
-
-   function Is_Valid_Unicode_String (S : Unicode_String) return Boolean is
-   begin
-      for C of S loop
-         if Character'Pos(C) > 255 then
-            return False;
-         end if;
-      end loop;
-      return True;
-   exception
-      when others => return False;
-   end Is_Valid_Unicode_String;
 
    function Is_Valid_Code_Point (CP : Unicode_Code_Point) return Boolean is
    begin
