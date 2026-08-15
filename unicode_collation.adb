@@ -1,337 +1,132 @@
-with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-
+-- unicode_collation.adb
+-- Implementation of the Unicode Collation Algorithm logic
 package body Unicode_Collation is
 
-   Level_Separator : constant Collation_Weight := 0;
-   DUCET_Initialized : Boolean := False;
-   Max_Weight : constant Collation_Weight := 65535;
-
-   Default_Settings : constant Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
-
-   function Unicode_Code_Point_Hash (Key : Unicode_Code_Point) return Ada.Containers.Hash_Type is
+   -----------------------------------------------------
+   -- DUCET External Data Mocking
+   -----------------------------------------------------
+   function Get_Default_Table return Character_Table is
+      Table : Character_Table := (others => (Primary => 9999, Secondary => 0, Tertiary => 0));
    begin
-      return Ada.Containers.Hash_Type(Key mod 2**32);
-   end Unicode_Code_Point_Hash;
-
-   function Unicode_Code_Point_Equal (Left, Right : Unicode_Code_Point) return Boolean is
-   begin
-      return Left = Right;
-   end Unicode_Code_Point_Equal;
-
-   procedure Initialize_DUCET is
-      procedure Add_Entry (CP : Unicode_Code_Point; P, S, T, Q : Collation_Weight; Variable : Boolean := False) is
-      begin
-         DUCET.Insert(Key => CP, New_Item => CET_Entry'(Element => (P, S, T, Q, Variable)));
-      end Add_Entry;
-   begin
-      if DUCET_Initialized then
-         return;
-      end if;
-      DUCET.Clear;
-      Add_Entry(32, 0x0001, 0, 0, 0, True);
-      Add_Entry(33, 0x0002, 0, 0, 0, True);
-      Add_Entry(34, 0x0003, 0, 0, 0, True);
-      Add_Entry(39, 0x0004, 0, 0, 0, True);
-      Add_Entry(44, 0x0005, 0, 0, 0, True);
-      Add_Entry(45, 0x0006, 0, 0, 0, True);
-      Add_Entry(46, 0x0007, 0, 0, 0, True);
-      Add_Entry(58, 0x0008, 0, 0, 0, True);
-      Add_Entry(59, 0x0009, 0, 0, 0, True);
-      for I in 0 .. 9 loop
-         Add_Entry(48 + I, 0x0010 + Collation_Weight(I), 0, 0, 0, True);
+      -- Standardize basic Alphabet (Primary weights matter, Case is Tertiary)
+      for I in Character'Pos('a') .. Character'Pos('z') loop
+         declare
+            C : Character := Character'Val(I);
+            Upper_C : Character := Character'Val(I - 32);
+            Base_Weight : Weight_Level := Weight_Level(I * 10);
+         begin
+            -- Lowercase: Primary = Base, Secondary = 20, Tertiary = 2 (Lower)
+            Table(C) := (Primary => Base_Weight, Secondary => 20, Tertiary => 2);
+            -- Uppercase: Primary = Base, Secondary = 20, Tertiary = 8 (Upper)
+            Table(Upper_C) := (Primary => Base_Weight, Secondary => 20, Tertiary => 8);
+         end;
       end loop;
-      for I in 0 .. 25 loop
-         Add_Entry(65 + I, 0x2000 + Collation_Weight(I), 0, 2, 0);
-      end loop;
-      for I in 0 .. 25 loop
-         Add_Entry(97 + I, 0x2000 + Collation_Weight(I), 0, 3, 0);
-      end loop;
-      Add_Entry(233, 0x2004, 0x0020, 0, 0);
-      Add_Entry(232, 0x2004, 0x0021, 0, 0);
-      Add_Entry(234, 0x2004, 0x0022, 0, 0);
-      Add_Entry(227, 0x2000, 0x0020, 0, 0);
-      Add_Entry(225, 0x2000, 0x0021, 0, 0);
-      Add_Entry(224, 0x2000, 0x0022, 0, 0);
-      Add_Entry(196, 0x2000, 0x0023, 2, 0);
-      Add_Entry(228, 0x2000, 0x0023, 3, 0);
-      Add_Entry(214, 0x2014, 0x0020, 2, 0);
-      Add_Entry(246, 0x2014, 0x0020, 3, 0);
-      Add_Entry(220, 0x2018, 0x0020, 2, 0);
-      Add_Entry(252, 0x2018, 0x0020, 3, 0);
-      Add_Entry(223, 0x2019, 0, 0, 0);
-      DUCET_Initialized := True;
-   exception
-      when others =>
-         DUCET_Initialized := False;
-         raise;
-   end Initialize_DUCET;
 
-   function Is_DUCET_Initialized return Boolean is (DUCET_Initialized);
+      -- Numbers (sorted before letters usually)
+      for I in Character'Pos('0') .. Character'Pos('9') loop
+         Table(Character'Val(I)) := (Primary => Weight_Level(I), Secondary => 20, Tertiary => 2);
+      end loop;
 
-   function Normalize (Input : String; Mode : Normalization_Mode := NFD) return String is
+      -- Punctuation (Ignorable at primary level in UCA standard)
+      Table(' ') := (Primary => 0, Secondary => 0, Tertiary => 1);
+      Table('-') := (Primary => 0, Secondary => 0, Tertiary => 2);
+      Table(',') := (Primary => 0, Secondary => 0, Tertiary => 3);
+
+      return Table;
+   end Get_Default_Table;
+
+   -----------------------------------------------------
+   -- Core Algorithm Helpers
+   -----------------------------------------------------
+   function Get_Weights (Str : String; Table : Character_Table) return Weight_Array is
+      Result : Weight_Array(1 .. Str'Length);
    begin
-      if Mode = None then
-         return Input;
-      end if;
-      declare
-         Output : Unbounded_String;
-      begin
-         for I in 1 .. Input'Length loop
-            case Input(I) is
-               when Character'Val(196) => Append(Output, "A");
-               when Character'Val(228) => Append(Output, "a");
-               when Character'Val(214) => Append(Output, "O");
-               when Character'Val(246) => Append(Output, "o");
-               when Character'Val(220) => Append(Output, "U");
-               when Character'Val(252) => Append(Output, "u");
-               when others => Append(Output, Input(I));
+      for I in Str'Range loop
+         Result(1 + I - Str'First) := Table(Str(I));
+      end loop;
+      return Result;
+   end Get_Weights;
+
+   function Extract_Level_Weights (Weights : Weight_Array; Level : Integer) return Level_Array is
+      Temp : Level_Array(1 .. Weights'Length);
+      Count : Natural := 0;
+   begin
+      for I in Weights'Range loop
+         declare
+            Val : Weight_Level;
+         begin
+            case Level is
+               when 1 => Val := Weights(I).Primary;
+               when 2 => Val := Weights(I).Secondary;
+               when 3 => Val := Weights(I).Tertiary;
+               when others => Val := 0;
             end case;
-         end loop;
-         return To_String(Output);
-      end;
-   exception
-      when others => raise Normalization_Error with "Normalization failed";
-   end Normalize;
 
-   function To_Code_Points (S : String) return Code_Point_Array is
-      Result : Code_Point_Array(1 .. S'Length);
-   begin
-      for I in S'Range loop
-         Result(I) := Unicode_Code_Point(Character'Pos(S(I)));
-      end loop;
-      return Result;
-   exception
-      when others => raise Invalid_Code_Point with "Invalid code point in string";
-   end To_Code_Points;
-
-   function Get_Collation_Element (Code_Point : Unicode_Code_Point; Table : CET_Maps.Map := DUCET) return Collation_Element is
-   begin
-      if not DUCET_Initialized then
-         Initialize_DUCET;
-      end if;
-      if Table.Contains(Key => Code_Point) then
-         return Table.Element(Key => Code_Point).Element;
-      else
-         return (Primary_Weight => Collation_Weight(Code_Point mod 65536), others => 0, Is_Variable => True);
-      end if;
-   end Get_Collation_Element;
-
-   function Produce_Collation_Elements (Input : String; Settings : Parametric_Settings) return Collation_Element_Array is
-      Normalized : String := Normalize(Input, Settings.Normalization);
-      Points     : Code_Point_Array := To_Code_Points(Normalized);
-      Result     : Collation_Element_Array(1 .. Points'Length);
-   begin
-      if not DUCET_Initialized then
-         Initialize_DUCET;
-      end if;
-      for I in Points'Range loop
-         Result(I) := Get_Collation_Element(Points(I), DUCET);
-      end loop;
-      return Result;
-   exception
-      when others => raise Collation_Error with "Failed to produce collation elements";
-   end Produce_Collation_Elements;
-
-   function Form_Sort_Key (Elements : Collation_Element_Array; Settings : Parametric_Settings) return Sort_Key is
-      Max_Length : constant Positive := Elements'Length * 5;
-      Result     : Sort_Key(1 .. Max_Length);
-      Result_Index : Positive := 1;
-   begin
-      if not DUCET_Initialized then
-         Initialize_DUCET;
-      end if;
-      for Element of Elements loop
-         if Settings.Strength >= Primary then
-            Result(Result_Index) := Element.Primary_Weight;
-            Result_Index := Result_Index + 1;
-            if Settings.Strength >= Secondary then
-               Result(Result_Index) := Level_Separator;
-               Result_Index := Result_Index + 1;
-            end if;
-         end if;
-         if Settings.Strength >= Secondary then
-            declare
-               S : Collation_Weight := Element.Secondary_Weight;
-            begin
-               if Settings.Backward_Accents = On then
-                  S := Max_Weight - S;
-               end if;
-               Result(Result_Index) := S;
-               Result_Index := Result_Index + 1;
-            end;
-            if Settings.Strength >= Tertiary then
-               Result(Result_Index) := Level_Separator;
-               Result_Index := Result_Index + 1;
-            end if;
-         end if;
-         if Settings.Strength >= Tertiary then
-            Result(Result_Index) := Element.Tertiary_Weight;
-            Result_Index := Result_Index + 1;
-            if Settings.Strength >= Quaternary then
-               Result(Result_Index) := Level_Separator;
-               Result_Index := Result_Index + 1;
-            end if;
-         end if;
-         if Settings.Strength >= Quaternary then
-            declare
-               Q : Collation_Weight := Element.Quaternary_Weight;
-            begin
-               case Settings.Variable_Weight is
-                  when Shifted => if Element.Is_Variable then Q := Max_Weight; end if;
-                  when Shift_Trimmed => if Element.Is_Variable then Q := 0; end if;
-                  when others => null;
-               end case;
-               Result(Result_Index) := Q;
-               Result_Index := Result_Index + 1;
-            end;
-         end if;
-      end loop;
-      return Result(1 .. Result_Index - 1);
-   exception
-      when others => raise Collation_Error with "Failed to form sort key";
-   end Form_Sort_Key;
-
-   function Compare_Sort_Keys (Key1, Key2 : Sort_Key; Settings : Parametric_Settings) return Integer is
-      Max_Len : constant Positive := Positive'Max(Key1'Length, Key2'Length);
-   begin
-      for I in 1 .. Max_Len loop
-         declare
-            W1 : Collation_Weight := (if I <= Key1'Length then Key1(I) else 0);
-            W2 : Collation_Weight := (if I <= Key2'Length then Key2(I) else 0);
-         begin
-            if W1 < W2 then return -1;
-            elsif W1 > W2 then return 1;
+            -- In UCA, 0-weights are skipped for comparison at that level
+            if Val /= 0 then
+               Count := Count + 1;
+               Temp(Count) := Val;
             end if;
          end;
       end loop;
-      if Key1'Length < Key2'Length then return -1;
-      elsif Key1'Length > Key2'Length then return 1;
-      else return 0;
-      end if;
-   exception
-      when others => raise Collation_Error with "Failed to compare sort keys";
-   end Compare_Sort_Keys;
+      return Temp(1 .. Count);
+   end Extract_Level_Weights;
 
-   function Compare (Str1, Str2 : String; Settings : Parametric_Settings) return Integer is
-      Norm1 : String := Normalize(Str1, Settings.Normalization);
-      Norm2 : String := Normalize(Str2, Settings.Normalization);
-      Elems1 : Collation_Element_Array := Produce_Collation_Elements(Norm1, Settings);
-      Elems2 : Collation_Element_Array := Produce_Collation_Elements(Norm2, Settings);
-      Key1 : Sort_Key := Form_Sort_Key(Elems1, Settings);
-      Key2 : Sort_Key := Form_Sort_Key(Elems2, Settings);
+   -----------------------------------------------------
+   -- Multi-Level Comparison Engine
+   -----------------------------------------------------
+   function Compare_Weights (Left, Right : Weight_Array) return Collation_Result is
    begin
-      return Compare_Sort_Keys(Key1, Key2, Settings);
-   exception
-      when others => raise Collation_Error with "Comparison failed";
-   end Compare;
-
-   function Are_Equal (Str1, Str2 : String; Settings : Parametric_Settings) return Boolean is
-   begin
-      return Compare(Str1, Str2, Settings) = 0;
-   end Are_Equal;
-
-   function Compare_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings) return Integer is
-      Norm1 : String := Normalize(Str1, Settings.Normalization);
-      Norm2 : String := Normalize(Str2, Settings.Normalization);
-      Elems1 : Collation_Element_Array := Produce_Collation_Elements(Norm1, Settings);
-      Elems2 : Collation_Element_Array := Produce_Collation_Elements(Norm2, Settings);
-      Max_Len : constant Positive := Positive'Max(Elems1'Length, Elems2'Length);
-   begin
-      for I in 1 .. Max_Len loop
+      -- Process Levels 1 to 3 sequentially
+      for Lvl in 1 .. 3 loop
          declare
-            E1 : Collation_Element := (if I <= Elems1'Length then Elems1(I) else (others => 0));
-            E2 : Collation_Element := (if I <= Elems2'Length then Elems2(I) else (others => 0));
+            L_Level : constant Level_Array := Extract_Level_Weights(Left, Lvl);
+            R_Level : constant Level_Array := Extract_Level_Weights(Right, Lvl);
+            Min_Len : constant Natural := Natural'Min(L_Level'Length, R_Level'Length);
          begin
-            if Settings.Strength >= Primary and then E1.Primary_Weight /= E2.Primary_Weight then
-               return (if E1.Primary_Weight < E2.Primary_Weight then -1 else 1);
-            end if;
-            if Settings.Strength >= Secondary then
-               declare
-                  S1 : Collation_Weight := E1.Secondary_Weight;
-                  S2 : Collation_Weight := E2.Secondary_Weight;
-               begin
-                  if Settings.Backward_Accents = On then
-                     S1 := Max_Weight - S1;
-                     S2 := Max_Weight - S2;
-                  end if;
-                  if S1 /= S2 then return (if S1 < S2 then -1 else 1); end if;
-               end;
-            end if;
-            if Settings.Strength >= Tertiary and then E1.Tertiary_Weight /= E2.Tertiary_Weight then
-               return (if E1.Tertiary_Weight < E2.Tertiary_Weight then -1 else 1);
-            end if;
-            if Settings.Strength >= Quaternary then
-               declare
-                  Q1 : Collation_Weight := E1.Quaternary_Weight;
-                  Q2 : Collation_Weight := E2.Quaternary_Weight;
-               begin
-                  case Settings.Variable_Weight is
-                     when Shifted => 
-                        if E1.Is_Variable then Q1 := Max_Weight; end if; 
-                        if E2.Is_Variable then Q2 := Max_Weight; end if;
-                     when Shift_Trimmed => 
-                        if E1.Is_Variable then Q1 := 0; end if; 
-                        if E2.Is_Variable then Q2 := 0; end if;
-                     when others => null;
-                  end case;
-                  if Q1 /= Q2 then return (if Q1 < Q2 then -1 else 1); end if;
-               end;
-            end if;
+            for I in 1 .. Min_Len loop
+               if L_Level(I) < R_Level(I) then return Less; end if;
+               if L_Level(I) > R_Level(I) then return Greater; end if;
+            end loop;
+
+            -- If common prefix is identical, the shorter one is "Less"
+            if L_Level'Length < R_Level'Length then return Less; end if;
+            if L_Level'Length > R_Level'Length then return Greater; end if;
          end;
       end loop;
-      if Elems1'Length < Elems2'Length then return -1;
-      elsif Elems1'Length > Elems2'Length then return 1;
-      else return 0;
-      end if;
-   exception
-      when others => raise Collation_Error with "Preemptive comparison failed";
-   end Compare_Preemptive;
 
-   function Compare_Non_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings) return Integer is
-   begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Non_Preemptive;
+      return Equal;
+   end Compare_Weights;
 
-   function Compare_Primary (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
+   -----------------------------------------------------
+   -- Public Variants
+   -----------------------------------------------------
+   function Compare_Standard (Left, Right : String; Table : Character_Table) return Collation_Result is
    begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Primary;
+      if Left'Length = 0 and Right'Length = 0 then return Equal; end if;
+      if Left'Length = 0 then return Less; end if;
+      if Right'Length = 0 then return Greater; end if;
 
-   function Compare_Secondary (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Secondary, Non_Ignorable, Off, Off, NFD);
-   begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Secondary;
+      return Compare_Weights(Get_Weights(Left, Table), Get_Weights(Right, Table));
+   end Compare_Standard;
 
-   function Compare_Tertiary (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
+   function Compare_Ignore_Punctuation (Left, Right : String; Table : Character_Table) return Collation_Result is
+      Mod_Table : Character_Table := Table;
    begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Tertiary;
+      -- Variable weighting: shift punctuation weights to absolute zero (completely ignored)
+      Mod_Table(' ') := (0, 0, 0);
+      Mod_Table('-') := (0, 0, 0);
+      Mod_Table(',') := (0, 0, 0);
+      return Compare_Standard(Left, Right, Mod_Table);
+   end Compare_Ignore_Punctuation;
 
-   function Compare_Quaternary (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Quaternary, Non_Ignorable, Off, Off, NFD);
+   function Apply_Tailoring (Base_Table : Character_Table; 
+                             Target     : Character; 
+                             New_Weight : Collation_Weight) return Character_Table is
+      Mod_Table : Character_Table := Base_Table;
    begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Quaternary;
-
-   function Compare_Non_Ignorable (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
-   begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Non_Ignorable;
-
-   function Compare_Shifted (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Tertiary, Shifted, Off, Off, NFD);
-   begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Shifted;
-
-   function Compare_Shift_Trimmed (Str1, Str2 : String) return Integer is
-      Settings : Parametric_Settings := (Tertiary, Shift_Trimmed, Off, Off, NFD);
-   begin
-      return Compare(Str1, Str2, Settings);
-   end Compare_Shift_Trimmed;
+      Mod_Table(Target) := New_Weight;
+      return Mod_Table;
+   end Apply_Tailoring;
 
 end Unicode_Collation;
