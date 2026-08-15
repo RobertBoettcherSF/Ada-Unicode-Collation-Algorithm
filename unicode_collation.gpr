@@ -1,52 +1,8 @@
---  unicode_collation.gpr
---  GNAT Project File for Unicode Collation Algorithm
---
-
 project Unicode_Collation is
 
-   -- Source directories (all files in root)
    for Source_Dirs use (".");
-
-   -- Object directory
    for Object_Dir use "obj";
-
-   -- Executable directory
    for Exec_Dir use "bin";
-
-   -- Main program (if any)
-   -- for Main use ("main.adb");
-
-   -- Compiler options
-   for Compiler ("ada") use "gnatmake";
-
-   -- Build modes
-   type Build_Mode is ("debug", "release");
-
-   -- Package compiler switches
-   package Compiler is
-      for Default_Switches ("ada") use
-        ("-g",  -- Debug information
-         "-O2", -- Optimization level 2
-         "-gnatN", -- Disable assertions in release
-         "-gnata", -- Enable assertions in debug
-         "-gnatw.a", -- Enable all warnings
-         "-gnatw.e"); -- Treat warnings as errors
-   end Compiler;
-
-   -- Package builder switches
-   package Builder is
-      for Default_Switches ("ada") use ("-j0"); -- Use all CPUs
-   end Builder;
-
-   -- Package linker switches
-   package Linker is
-      for Default_Switches ("ada") use ();
-   end Linker;
-
-   -- Naming conventions
-   package Naming is
-      for Casing use "lowercase";
-      for Dot_Replacement use "-";
-   end Naming;
+   for Main use ("main.adb");
 
 end Unicode_Collation;
