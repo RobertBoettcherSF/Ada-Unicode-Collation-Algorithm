@@ -1,5 +1,4 @@
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with Ada.Containers.Vectors;
 
 package body Unicode_Collation is
 
@@ -225,7 +224,7 @@ package body Unicode_Collation is
    end Compare;
 
    procedure Sort (Strings : in out String_Vectors.Vector; Settings : Parametric_Settings := Default_Settings) is
-      N : constant Positive := Positive(Strings.Length);
+      N : constant Positive := Positive(String_Vectors.Length(Strings));
       Temp : String;
    begin
       for I in 1 .. N - 1 loop
@@ -236,8 +235,8 @@ package body Unicode_Collation is
             begin
                if Compare(Str1, Str2, Settings) > 0 then
                   Temp := Str1;
-                  Strings.Replace_Element(J, Str2);
-                  Strings.Replace_Element(J + 1, Temp);
+                  String_Vectors.Replace_Element(Strings, J, Str2);
+                  String_Vectors.Replace_Element(Strings, J + 1, Temp);
                end if;
             end;
          end loop;
@@ -386,9 +385,5 @@ package body Unicode_Collation is
    end Are_Valid_Settings;
 
    function Get_Level_Separator return Collation_Weight is (Level_Separator);
-
-   package String_Vectors is new Ada.Containers.Vectors(
-      Index_Type => Positive,
-      Element_Type => String);
 
 end Unicode_Collation;
