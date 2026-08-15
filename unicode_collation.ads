@@ -1,6 +1,5 @@
 with Ada.Strings.Unbounded;
 with Ada.Containers.Hashed_Maps;
-with Ada.Containers.Vectors;
 
 package Unicode_Collation is
 
@@ -51,27 +50,20 @@ package Unicode_Collation is
       Normalization   : Normalization_Mode;
    end record;
 
-   Default_Settings : constant Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
-
-   package String_Vectors is new Ada.Containers.Vectors(Positive, String);
-
    Collation_Error : exception;
    Normalization_Error : exception;
    Invalid_Code_Point : exception;
 
    function Normalize (Input : String; Mode : Normalization_Mode := NFD) return String;
-   function Produce_Collation_Elements (Input : String; Settings : Parametric_Settings := Default_Settings) return Collation_Element_Array;
-   function Form_Sort_Key (Elements : Collation_Element_Array; Settings : Parametric_Settings := Default_Settings) return Sort_Key;
-   function Compare_Sort_Keys (Key1, Key2 : Sort_Key; Settings : Parametric_Settings := Default_Settings) return Integer;
+   function Produce_Collation_Elements (Input : String; Settings : Parametric_Settings) return Collation_Element_Array;
+   function Form_Sort_Key (Elements : Collation_Element_Array; Settings : Parametric_Settings) return Sort_Key;
+   function Compare_Sort_Keys (Key1, Key2 : Sort_Key; Settings : Parametric_Settings) return Integer;
 
-   function Compare (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
-   procedure Sort (Strings : in out String_Vectors.Vector; Settings : Parametric_Settings := Default_Settings);
-   function Are_Equal (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Boolean;
+   function Compare (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
+   function Are_Equal (Str1, Str2 : String; Settings : Parametric_Settings) return Boolean;
 
-   function Compare_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
-   function Compare_Non_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
-   function Compare_Static_Tailored (Str1, Str2 : String; Tailoring : CET_Maps.Map; Settings : Parametric_Settings := Default_Settings) return Integer;
-   function Compare_Dynamic_Tailored (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
+   function Compare_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
+   function Compare_Non_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
 
    function Compare_Primary (Str1, Str2 : String) return Integer;
    function Compare_Secondary (Str1, Str2 : String) return Integer;
@@ -87,9 +79,5 @@ package Unicode_Collation is
 
    procedure Initialize_DUCET;
    function Is_DUCET_Initialized return Boolean;
-   function Get_Level_Separator return Collation_Weight;
-
-   function Is_Valid_Code_Point (CP : Unicode_Code_Point) return Boolean;
-   function Are_Valid_Settings (Settings : Parametric_Settings) return Boolean;
 
 end Unicode_Collation;
