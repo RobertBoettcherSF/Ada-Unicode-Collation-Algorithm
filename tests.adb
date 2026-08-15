@@ -81,8 +81,8 @@ begin
 
    Print_Test_Header("Backward Accents");
    declare
-      Settings_Normal : Parametric_Settings := (Backward_Accents => Off, others => Default_Settings);
-      Settings_Backward : Parametric_Settings := (Backward_Accents => On, others => Default_Settings);
+      Settings_Normal : Parametric_Settings := (Secondary, Non_Ignorable, Off, Off, NFD);
+      Settings_Backward : Parametric_Settings := (Secondary, Non_Ignorable, On, Off, NFD);
    begin
       Print_Assertion(1, "Normal: é > e", Compare("e", String'(Character'Val(233)), Settings_Normal) < 0);
       Print_Assertion(2, "Backward: é < e", Compare("e", String'(Character'Val(233)), Settings_Backward) > 0);
@@ -91,8 +91,8 @@ begin
 
    Print_Test_Header("Case Level");
    declare
-      Settings_No_Case : Parametric_Settings := (Case_Level => Off, others => Default_Settings);
-      Settings_With_Case : Parametric_Settings := (Case_Level => On, others => Default_Settings);
+      Settings_No_Case : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
+      Settings_With_Case : Parametric_Settings := (Tertiary, Non_Ignorable, Off, On, NFD);
    begin
       Print_Assertion(1, "No case level: A < a", Compare("A", "a", Settings_No_Case) < 0);
       Print_Assertion(2, "With case level: A < a", Compare("A", "a", Settings_With_Case) < 0);
@@ -101,8 +101,8 @@ begin
 
    Print_Test_Header("Normalization");
    declare
-      Settings_NFD : Parametric_Settings := (Normalization => NFD, others => Default_Settings);
-      Settings_None : Parametric_Settings := (Normalization => None, others => Default_Settings);
+      Settings_NFD : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
+      Settings_None : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, None);
    begin
       Print_Assertion(1, "NFD enabled", Settings_NFD.Normalization = NFD);
       Print_Assertion(2, "Normalization disabled", Settings_None.Normalization = None);
@@ -117,7 +117,7 @@ begin
       Print_Assertion(1, "Sort key non-empty", Key'Length > 0);
    end;
    declare
-      Settings : Parametric_Settings := (Strength => Primary, others => Default_Settings);
+      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
       Elems : Collation_Element_Array := Produce_Collation_Elements("a");
       Key : Sort_Key := Form_Sort_Key(Elems, Settings);
    begin
@@ -147,7 +147,7 @@ begin
    Print_Test_Header("Static Tailoring");
    declare
       Custom_Tailoring : CET_Maps.Map;
-      Settings : Parametric_Settings := Default_Settings;
+      Settings : Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
    begin
       Custom_Tailoring.Insert(Key => Unicode_Code_Point(Character'Pos('Z')),
          New_Item => CET_Entry'(Element => (0x1000, 0, 0, 0, False)));
@@ -159,17 +159,17 @@ begin
 
    Print_Test_Header("Dynamic Tailoring");
    declare
-      Settings : Parametric_Settings := (Strength => Primary, others => Default_Settings);
+      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
    begin
       Print_Assertion(1, "Dynamic primary: A = a", Compare_Dynamic_Tailored("A", "a", Settings) = 0);
    end;
    declare
-      Settings : Parametric_Settings := (Variable_Weight => Shifted, others => Default_Settings);
+      Settings : Parametric_Settings := (Tertiary, Shifted, Off, Off, NFD);
    begin
       Print_Assertion(2, "Dynamic shifted: a = a,", Compare_Dynamic_Tailored("a", "a,", Settings) = 0);
    end;
    declare
-      Settings : Parametric_Settings := (Strength => Secondary, Variable_Weight => Shift_Trimmed, others => Default_Settings);
+      Settings : Parametric_Settings := (Secondary, Shift_Trimmed, Off, Off, NFD);
    begin
       Print_Assertion(3, "Multiple settings work", Compare_Dynamic_Tailored("a", "á", Settings) /= 0);
    end;
