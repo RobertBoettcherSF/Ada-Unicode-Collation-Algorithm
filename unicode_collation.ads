@@ -1,6 +1,5 @@
 with Ada.Strings.Unbounded;
 with Ada.Containers.Hashed_Maps;
-with Ada.Containers.Vectors;
 
 package Unicode_Collation is
 
@@ -58,44 +57,39 @@ package Unicode_Collation is
       Case_Level       => Off,
       Normalization   => NFD);
 
-   type Unicode_String is new String;
-
    Collation_Error : exception;
    Normalization_Error : exception;
    Invalid_Code_Point : exception;
 
-   function Normalize (Input : Unicode_String; Mode : Normalization_Mode := NFD) return Unicode_String;
-   function Produce_Collation_Elements (Input : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Collation_Element_Array;
+   function Normalize (Input : String; Mode : Normalization_Mode := NFD) return String;
+   function Produce_Collation_Elements (Input : String; Settings : Parametric_Settings := Default_Settings) return Collation_Element_Array;
    function Form_Sort_Key (Elements : Collation_Element_Array; Settings : Parametric_Settings := Default_Settings) return Sort_Key;
    function Compare_Sort_Keys (Key1, Key2 : Sort_Key; Settings : Parametric_Settings := Default_Settings) return Integer;
 
-   function Compare (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Integer;
-   procedure Sort (Strings : in out Ada.Containers.Vectors.Vector; Settings : Parametric_Settings := Default_Settings);
-   function Are_Equal (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Boolean;
+   function Compare (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
+   function Are_Equal (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Boolean;
 
-   function Compare_Preemptive (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Integer;
-   function Compare_Non_Preemptive (Str1, Str2 : Unicode_String; Settings : Parametric_Settings := Default_Settings) return Integer;
-   function Compare_Static_Tailored (Str1, Str2 : Unicode_String; Tailoring : CET_Maps.Map; Settings : Parametric_Settings := Default_Settings) return Integer;
-   function Compare_Dynamic_Tailored (Str1, Str2 : Unicode_String; Settings : Parametric_Settings) return Integer;
+   function Compare_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
+   function Compare_Non_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
+   function Compare_Static_Tailored (Str1, Str2 : String; Tailoring : CET_Maps.Map; Settings : Parametric_Settings := Default_Settings) return Integer;
+   function Compare_Dynamic_Tailored (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
 
-   function Compare_Primary (Str1, Str2 : Unicode_String) return Integer;
-   function Compare_Secondary (Str1, Str2 : Unicode_String) return Integer;
-   function Compare_Tertiary (Str1, Str2 : Unicode_String) return Integer;
-   function Compare_Quaternary (Str1, Str2 : Unicode_String) return Integer;
+   function Compare_Primary (Str1, Str2 : String) return Integer;
+   function Compare_Secondary (Str1, Str2 : String) return Integer;
+   function Compare_Tertiary (Str1, Str2 : String) return Integer;
+   function Compare_Quaternary (Str1, Str2 : String) return Integer;
 
-   function Compare_Non_Ignorable (Str1, Str2 : Unicode_String) return Integer;
-   function Compare_Shifted (Str1, Str2 : Unicode_String) return Integer;
-   function Compare_Shift_Trimmed (Str1, Str2 : Unicode_String) return Integer;
+   function Compare_Non_Ignorable (Str1, Str2 : String) return Integer;
+   function Compare_Shifted (Str1, Str2 : String) return Integer;
+   function Compare_Shift_Trimmed (Str1, Str2 : String) return Integer;
 
-   function To_Code_Points (S : Unicode_String) return Code_Point_Array;
-   function To_Unicode_String (Points : Code_Point_Array) return Unicode_String;
+   function To_Code_Points (S : String) return Code_Point_Array;
    function Get_Collation_Element (Code_Point : Unicode_Code_Point; Table : CET_Maps.Map := DUCET) return Collation_Element;
 
    procedure Initialize_DUCET;
    function Is_DUCET_Initialized return Boolean;
    function Get_Level_Separator return Collation_Weight;
 
-   function Is_Valid_Unicode_String (S : Unicode_String) return Boolean;
    function Is_Valid_Code_Point (CP : Unicode_Code_Point) return Boolean;
    function Are_Valid_Settings (Settings : Parametric_Settings) return Boolean;
 
