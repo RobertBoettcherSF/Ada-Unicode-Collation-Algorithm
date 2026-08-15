@@ -1,83 +1,54 @@
-with Ada.Strings.Unbounded;
-with Ada.Containers.Hashed_Maps;
-
+-- unicode_collation.ads
+-- Specification for the Unicode Collation Algorithm (UCA)
 package Unicode_Collation is
 
-   type Unicode_Code_Point is range 0 .. 16#10FFFF#;
+   -- UCA uses 16-bit weight levels.
+   type Weight_Level is mod 2**16;
 
-   type Strength_Level is (Primary, Secondary, Tertiary, Quaternary, Identical);
-   type Variable_Weighting is (Non_Ignorable, Shifted, Shift_Trimmed);
-   type Backward_Accents is (Off, On);
-   type Case_Level is (Off, On);
-   type Normalization_Mode is (None, NFD);
-
-   type Collation_Weight is range 0 .. 65535;
-
-   type Collation_Element is record
-      Primary_Weight    : Collation_Weight := 0;
-      Secondary_Weight  : Collation_Weight := 0;
-      Tertiary_Weight    : Collation_Weight := 0;
-      Quaternary_Weight : Collation_Weight := 0;
-      Is_Variable        : Boolean := False;
+   -- A collation element consists of Primary, Secondary, and Tertiary weights.
+   type Collation_Weight is record
+      Primary   : Weight_Level;
+      Secondary : Weight_Level;
+      Tertiary  : Weight_Level;
    end record;
 
-   type Code_Point_Array is array (Positive range <>) of Unicode_Code_Point;
-   type Collation_Element_Array is array (Positive range <>) of Collation_Element;
-   type Sort_Key is array (Positive range <>) of Collation_Weight;
+   type Weight_Array is array (Positive range <>) of Collation_Weight;
+   type Level_Array is array (Positive range <>) of Weight_Level;
 
-   function Unicode_Code_Point_Hash (Key : Unicode_Code_Point) return Ada.Containers.Hash_Type;
-   function Unicode_Code_Point_Equal (Left, Right : Unicode_Code_Point) return Boolean;
+   type Collation_Result is (Less, Equal, Greater);
 
-   type CET_Entry is record
-      Element : Collation_Element;
-   end record;
+   -- Maps characters to their collation weights.
+   -- NOTE: In a full UCA implementation, this requires parsing the external DUCET file.
+   -- Here, it acts as a placeholder for the external DUCET data structure.
+   type Character_Table is array (Character) of Collation_Weight;
 
-   package CET_Maps is new Ada.Containers.Hashed_Maps(
-      Key_Type        => Unicode_Code_Point,
-      Element_Type    => CET_Entry,
-      Hash            => Unicode_Code_Point_Hash,
-      Equivalent_Keys => Unicode_Code_Point_Equal);
+   -- Generates a default mocked DUCET table for standard ASCII to demonstrate the algorithm.
+   function Get_Default_Table return Character_Table;
 
-   use CET_Maps;
+   -- UCA Variant 1: Standard multi-level comparison.
+   -- Compares Primary weights, then Secondary (if Primary equal), then Tertiary.
+   function Compare_Standard (Left, Right : String; Table : Character_Table) return Collation_Result;
 
-   DUCET : CET_Maps.Map;
+   -- UCA Variant 2: Variable Weighting (Ignore Punctuation).
+   -- Treats punctuation characters as completely ignorable (Weight = 0) at all levels.
+   function Compare_Ignore_Punctuation (Left, Right : String; Table : Character_Table) return Collation_Result;
 
-   type Parametric_Settings is record
-      Strength        : Strength_Level;
-      Variable_Weight : Variable_Weighting;
-      Backward_Accents: Backward_Accents;
-      Case_Level       : Case_Level;
-      Normalization   : Normalization_Mode;
-   end record;
+   -- UCA Variant 3: Tailoring.
+   -- Applies a custom patch/override to the weight table for locale-specific sorting,
+   -- then performs a standard comparison.
+   function Apply_Tailoring (Base_Table : Character_Table; 
+                             Target     : Character; 
+                             New_Weight : Collation_Weight) return Character_Table;
 
-   Collation_Error : exception;
-   Normalization_Error : exception;
-   Invalid_Code_Point : exception;
+   -- Exceptions
+   Null_String_Error : exception;
 
-   function Normalize (Input : String; Mode : Normalization_Mode := NFD) return String;
-   function Produce_Collation_Elements (Input : String; Settings : Parametric_Settings) return Collation_Element_Array;
-   function Form_Sort_Key (Elements : Collation_Element_Array; Settings : Parametric_Settings) return Sort_Key;
-   function Compare_Sort_Keys (Key1, Key2 : Sort_Key; Settings : Parametric_Settings) return Integer;
+private
 
-   function Compare (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
-   function Are_Equal (Str1, Str2 : String; Settings : Parametric_Settings) return Boolean;
+   -- Helper to extract non-zero weights for a specific level (core UCA mechanic)
+   function Extract_Level_Weights (Weights : Weight_Array; Level : Integer) return Level_Array;
 
-   function Compare_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
-   function Compare_Non_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings) return Integer;
-
-   function Compare_Primary (Str1, Str2 : String) return Integer;
-   function Compare_Secondary (Str1, Str2 : String) return Integer;
-   function Compare_Tertiary (Str1, Str2 : String) return Integer;
-   function Compare_Quaternary (Str1, Str2 : String) return Integer;
-
-   function Compare_Non_Ignorable (Str1, Str2 : String) return Integer;
-   function Compare_Shifted (Str1, Str2 : String) return Integer;
-   function Compare_Shift_Trimmed (Str1, Str2 : String) return Integer;
-
-   function To_Code_Points (S : String) return Code_Point_Array;
-   function Get_Collation_Element (Code_Point : Unicode_Code_Point; Table : CET_Maps.Map := DUCET) return Collation_Element;
-
-   procedure Initialize_DUCET;
-   function Is_DUCET_Initialized return Boolean;
+   -- Helper to convert a string to its collation elements based on the table
+   function Get_Weights (Str : String; Table : Character_Table) return Weight_Array;
 
 end Unicode_Collation;
