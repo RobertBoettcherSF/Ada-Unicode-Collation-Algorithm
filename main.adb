@@ -1,8 +1,17 @@
 with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Containers.Vectors;
 with Unicode_Collation; use Unicode_Collation;
 
 procedure Main is
+   package String_Vectors is new Ada.Containers.Vectors(Positive, String);
    Vec : String_Vectors.Vector;
+
+   function Compare_Wrapper (Left, Right : String) return Boolean is
+   begin
+      return Compare(Left, Right) < 0;
+   end Compare_Wrapper;
+
+   package String_Sorting is new String_Vectors.Generic_Sorting(Compare_Wrapper);
 
 begin
    Put_Line("Unicode Collation Algorithm Demo");
@@ -23,7 +32,7 @@ begin
    String_Vectors.Append(Vec, "123");
 
    Put_Line("Sorting with default settings (Tertiary strength):");
-   Sort(Vec);
+   String_Sorting.Sort(Vec);
    for I in 1 .. Positive(String_Vectors.Length(Vec)) loop
       Put_Line(Integer'Image(I) & ". " & String_Vectors.Element(Vec, I));
    end loop;
@@ -31,9 +40,13 @@ begin
 
    Put_Line("Sorting with Primary strength (case-insensitive):");
    declare
-      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
+      function Compare_Primary_Wrapper (Left, Right : String) return Boolean is
+      begin
+         return Compare_Primary(Left, Right) < 0;
+      end Compare_Primary_Wrapper;
+      package Primary_Sorting is new String_Vectors.Generic_Sorting(Compare_Primary_Wrapper);
    begin
-      Sort(Vec, Settings);
+      Primary_Sorting.Sort(Vec);
       for I in 1 .. Positive(String_Vectors.Length(Vec)) loop
          Put_Line(Integer'Image(I) & ". " & String_Vectors.Element(Vec, I));
       end loop;
