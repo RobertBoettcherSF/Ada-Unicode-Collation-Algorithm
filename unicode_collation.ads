@@ -43,19 +43,15 @@ package Unicode_Collation is
    DUCET : CET_Maps.Map;
 
    type Parametric_Settings is record
-      Strength        : Strength_Level := Tertiary;
-      Variable_Weight : Variable_Weighting := Non_Ignorable;
-      Backward_Accents: Backward_Accents := Off;
-      Case_Level       : Case_Level := Off;
-      Normalization   : Normalization_Mode := NFD;
+      Strength        : Strength_Level;
+      Variable_Weight : Variable_Weighting;
+      Backward_Accents: Backward_Accents;
+      Case_Level       : Case_Level;
+      Normalization   : Normalization_Mode;
    end record;
 
    Default_Settings : constant Parametric_Settings := 
-     (Strength        => Tertiary,
-      Variable_Weight => Non_Ignorable,
-      Backward_Accents=> Off,
-      Case_Level       => Off,
-      Normalization   => NFD);
+     (Tertiary, Non_Ignorable, Off, Off, NFD);
 
    Collation_Error : exception;
    Normalization_Error : exception;
