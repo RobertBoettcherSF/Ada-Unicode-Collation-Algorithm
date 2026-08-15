@@ -11,31 +11,31 @@ begin
 
    Initialize_DUCET;
 
-   Vec.Append("apple");
-   Vec.Append("Apple");
-   Vec.Append("ápple");
-   Vec.Append("banana");
-   Vec.Append("Banana");
-   Vec.Append("cherry");
-   Vec.Append("Cherry");
-   Vec.Append("apricot");
-   Vec.Append("Ápple");
-   Vec.Append("123");
+   String_Vectors.Append(Vec, "apple");
+   String_Vectors.Append(Vec, "Apple");
+   String_Vectors.Append(Vec, "ápple");
+   String_Vectors.Append(Vec, "banana");
+   String_Vectors.Append(Vec, "Banana");
+   String_Vectors.Append(Vec, "cherry");
+   String_Vectors.Append(Vec, "Cherry");
+   String_Vectors.Append(Vec, "apricot");
+   String_Vectors.Append(Vec, "Ápple");
+   String_Vectors.Append(Vec, "123");
 
    Put_Line("Sorting with default settings (Tertiary strength):");
    Sort(Vec);
-   for I in 1 .. Positive(Vec.Length) loop
-      Put_Line(Integer'Image(I) & ". " & Vec.Element(I));
+   for I in 1 .. Positive(String_Vectors.Length(Vec)) loop
+      Put_Line(Integer'Image(I) & ". " & String_Vectors.Element(Vec, I));
    end loop;
    New_Line;
 
    Put_Line("Sorting with Primary strength (case-insensitive):");
    declare
-      Settings : Parametric_Settings := (Strength => Primary, others => Default_Settings);
+      Settings : Parametric_Settings := (Primary, Non_Ignorable, Off, Off, NFD);
    begin
       Sort(Vec, Settings);
-      for I in 1 .. Positive(Vec.Length) loop
-         Put_Line(Integer'Image(I) & ". " & Vec.Element(I));
+      for I in 1 .. Positive(String_Vectors.Length(Vec)) loop
+         Put_Line(Integer'Image(I) & ". " & String_Vectors.Element(Vec, I));
       end loop;
    end;
    New_Line;
