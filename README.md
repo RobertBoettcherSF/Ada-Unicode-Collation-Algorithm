@@ -1,63 +1,26 @@
-with Ada.Text_IO; use Ada.Text_IO;
-with Ada.Containers.Vectors;
-with Unicode_Collation; use Unicode_Collation;
+# Unicode Collation Algorithm (UCA) - Ada Implementation
 
-procedure Main is
-   package Unicode_Vectors is new Ada.Containers.Vectors(
-      Index_Type => Positive,
-      Element_Type => Unicode_String);
+## Project Overview
 
-   Vec : Unicode_Vectors.Vector;
-   Strings : array (1 .. 10) of Unicode_String := (
-      "apple", "Apple", "ápple", "banana", "Banana",
-      "cherry", "Cherry", "apricot", "Ápple", "123");
+Complete Ada implementation of the **Unicode Collation Algorithm (UCA)** as defined in Unicode Technical Report #10. Provides customizable string comparison and sorting according to language-specific rules.
 
-begin
-   Put_Line("Unicode Collation Algorithm Demo");
-   Put_Line("=================================");
-   New_Line;
+## Features
 
-   Initialize_DUCET;
+### Implemented Variants
+- **Strength Levels**: Primary, Secondary, Tertiary, Quaternary, Identical
+- **Variable Weighting**: Non-Ignorable, Shifted, Shift-Trimmed  
+- **Comparison Modes**: Preemptive and Non-preemptive
+- **Tailoring**: Static and dynamic
+- **Parametric Settings**: Backward accents, case level, normalization
 
-   for S of Strings loop
-      Vec.Append(S);
-   end loop;
+## Testing
 
-   Put_Line("Sorting with default settings (Tertiary strength):");
-   Sort(Vec);
-   for I in 1 .. Positive(Vec.Length) loop
-      Put_Line(Integer'Image(I) & ". " & Unicode_String'(Vec.Element(I)));
-   end loop;
-   New_Line;
+**15 tests with 45+ assertions** verifying:
+- Functional correctness (basic comparisons, strength levels)
+- Algorithm variants (preemptive/non-preemptive, tailoring)
+- Edge cases (empty strings, long strings, special characters)
+- V&V: Verification (code matches spec), Validation (code meets intended use)
 
-   Put_Line("Sorting with Primary strength (case-insensitive):");
-   declare
-      Settings : Parametric_Settings := (Strength => Primary, others => Default_Settings);
-   begin
-      Sort(Vec, Settings);
-      for I in 1 .. Positive(Vec.Length) loop
-         Put_Line(Integer'Image(I) & ". " & Unicode_String'(Vec.Element(I)));
-      end loop;
-   end;
-   New_Line;
-
-   Put_Line("Comparison Examples:");
-   Put_Line("-------------------");
-   declare
-      Result : Integer;
-   begin
-      Result := Compare("apple", "Apple");
-      Put_Line("Compare(""apple"", ""Apple"") = " & Integer'Image(Result) &
-         (if Result < 0 then " (apple < Apple)" elsif Result > 0 then " (apple > Apple)" else " (equal)"));
-
-      Result := Compare("apple", "ápple");
-      Put_Line("Compare(""apple"", ""ápple"") = " & Integer'Image(Result) &
-         (if Result < 0 then " (apple < ápple)" elsif Result > 0 then " (apple > ápple)" else " (equal)"));
-
-      Result := Compare("123", "abc");
-      Put_Line("Compare(""123"", ""abc"") = " & Integer'Image(Result) &
-         (if Result < 0 then " (123 < abc)" elsif Result > 0 then " (123 > abc)" else " (equal)"));
-   end;
-
-   Put_Line("Demo complete.");
-end Main;
+### Run Tests
+```bash
+make test
