@@ -1,5 +1,6 @@
 with Ada.Strings.Unbounded;
 with Ada.Containers.Hashed_Maps;
+with Ada.Containers.Vectors;
 
 package Unicode_Collation is
 
@@ -50,8 +51,9 @@ package Unicode_Collation is
       Normalization   : Normalization_Mode;
    end record;
 
-   Default_Settings : constant Parametric_Settings := 
-     (Tertiary, Non_Ignorable, Off, Off, NFD);
+   Default_Settings : constant Parametric_Settings := (Tertiary, Non_Ignorable, Off, Off, NFD);
+
+   package String_Vectors is new Ada.Containers.Vectors(Positive, String);
 
    Collation_Error : exception;
    Normalization_Error : exception;
@@ -63,6 +65,7 @@ package Unicode_Collation is
    function Compare_Sort_Keys (Key1, Key2 : Sort_Key; Settings : Parametric_Settings := Default_Settings) return Integer;
 
    function Compare (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
+   procedure Sort (Strings : in out String_Vectors.Vector; Settings : Parametric_Settings := Default_Settings);
    function Are_Equal (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Boolean;
 
    function Compare_Preemptive (Str1, Str2 : String; Settings : Parametric_Settings := Default_Settings) return Integer;
