@@ -1,5 +1,6 @@
 with Ada.Strings.Unbounded;
 with Ada.Containers.Hashed_Maps;
+with Ada.Containers.Vectors;
 
 package Unicode_Collation is
 
@@ -24,7 +25,23 @@ package Unicode_Collation is
    type Code_Point_Array is array (Positive range <>) of Unicode_Code_Point;
    type Collation_Element_Array is array (Positive range <>) of Collation_Element;
    type Sort_Key is array (Positive range <>) of Collation_Weight;
-   type Unicode_String is new String;
+
+   function Unicode_Code_Point_Hash (Key : Unicode_Code_Point) return Ada.Containers.Hash_Type;
+   function Unicode_Code_Point_Equal (Left, Right : Unicode_Code_Point) return Boolean;
+
+   type CET_Entry is record
+      Element : Collation_Element;
+   end record;
+
+   package CET_Maps is new Ada.Containers.Hashed_Maps(
+      Key_Type        => Unicode_Code_Point,
+      Element_Type    => CET_Entry,
+      Hash            => Unicode_Code_Point_Hash,
+      Equivalent_Keys => Unicode_Code_Point_Equal);
+
+   use CET_Maps;
+
+   DUCET : CET_Maps.Map;
 
    type Parametric_Settings is record
       Strength        : Strength_Level := Tertiary;
@@ -41,18 +58,7 @@ package Unicode_Collation is
       Case_Level       => Off,
       Normalization   => NFD);
 
-   type CET_Entry is record
-      Element : Collation_Element;
-   end record;
-
-   package CET_Maps is new Ada.Containers.Hashed_Maps(
-      Key_Type        => Unicode_Code_Point,
-      Element_Type    => CET_Entry,
-      Hash            => Unicode_Code_Point_Hash,
-      Equivalent_Keys => Unicode_Code_Point_Equal);
-
-   use CET_Maps;
-   DUCET : CET_Maps.Map;
+   type Unicode_String is new String;
 
    Collation_Error : exception;
    Normalization_Error : exception;
@@ -81,8 +87,6 @@ package Unicode_Collation is
    function Compare_Shifted (Str1, Str2 : Unicode_String) return Integer;
    function Compare_Shift_Trimmed (Str1, Str2 : Unicode_String) return Integer;
 
-   function Unicode_Code_Point_Hash (Key : Unicode_Code_Point) return Ada.Containers.Hash_Type;
-   function Unicode_Code_Point_Equal (Left, Right : Unicode_Code_Point) return Boolean;
    function To_Code_Points (S : Unicode_String) return Code_Point_Array;
    function To_Unicode_String (Points : Code_Point_Array) return Unicode_String;
    function Get_Collation_Element (Code_Point : Unicode_Code_Point; Table : CET_Maps.Map := DUCET) return Collation_Element;
